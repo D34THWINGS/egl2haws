@@ -1,6 +1,9 @@
 package egl
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestParseReadingsMonthBase(t *testing.T) {
 	from, to := Date{2026, 1, 20}, Date{2026, 2, 10}
@@ -81,5 +84,37 @@ func TestDate(t *testing.T) {
 	}
 	if d.String() != "2026-02-28" {
 		t.Fatal("String")
+	}
+}
+
+// TestParseLiveFormat uses the shape of a real consommationsJournalieres
+// response (2026-11, volumes replaced with synthetic ones): litres, 0-based
+// months, extra fields (index, debitMin, volumeEstimeFuite).
+func TestParseLiveFormat(t *testing.T) {
+	body, err := os.ReadFile("testdata/consommationsJournalieres.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, base, err := parseReadings(body, Date{2026, 9, 20}, Date{2026, 11, 4}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !base.ZeroBased || !base.Decisive {
+		t.Errorf("month base %+v, want decisive 0-based (mois 9 + jour 31 only exists as October)", base)
+	}
+	if len(got) != 42 || got[0].Date != (Date{2026, 9, 21}) || got[len(got)-1].Date != (Date{2026, 11, 1}) {
+		t.Fatalf("got %d readings from %v to %v", len(got), got[0].Date, got[len(got)-1].Date)
+	}
+	total := 0.0
+	byDay := map[Date]float64{}
+	for i, r := range got {
+		total += r.Liters
+		byDay[r.Date] = r.Liters
+		if i > 0 && r.Date != got[i-1].Date.AddDays(1) {
+			t.Errorf("gap between %s and %s", got[i-1].Date, r.Date)
+		}
+	}
+	if got[0].Liters != 387 || byDay[Date{2026, 10, 31}] != 112 || got[len(got)-1].Liters != 107 || total != 9281 {
+		t.Errorf("unexpected volumes: first=%v oct31=%v last=%v total=%v", got[0].Liters, byDay[Date{2026, 10, 31}], got[len(got)-1].Liters, total)
 	}
 }

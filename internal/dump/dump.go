@@ -63,6 +63,10 @@ func redact(v any, key string) any {
 	case map[string]any:
 		m := make(map[string]any, len(x))
 		for k, val := range x {
+			if units, ok := val.(map[string]any); ok && k == "unites" {
+				m[k] = units // unit names only, nothing personal
+				continue
+			}
 			m[k] = redact(val, k)
 		}
 		return m

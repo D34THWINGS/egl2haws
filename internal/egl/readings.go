@@ -58,11 +58,12 @@ type rawReading struct {
 // "jour":D}]}],"unites":{"consommation":"m3"|"l"}}. A bare list of entries
 // is accepted too.
 //
-// The month base is not documented: the older EFluid API used 0-based months
-// (JS Date style), and it's unknown whether the current one does. It's
+// Months are 0-based (JS Date style): confirmed on the live API in 2026-11
+// (see testdata/consommationsJournalieres.json, where mois 9 / jour 31 is
+// October 31). As this isn't documented and could change, the base is still
 // detected from the data: month 0 means 0-based, month 12 means 1-based, and
 // otherwise the reading whose dates fall inside the requested range wins
-// (the wrong one shifts every date by a month).
+// (the wrong one shifts every date by a month); ties default to 0-based.
 func ParseReadings(body []byte, from, to Date) ([]Reading, error) {
 	r, _, err := parseReadings(body, from, to, nil)
 	return r, err

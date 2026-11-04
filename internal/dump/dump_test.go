@@ -12,12 +12,12 @@ import (
 func TestRedactKeepsReadingsDropsPersonalData(t *testing.T) {
 	body := []byte(`{
 		"postes":[{"data":[{"consommation":0.154,"annee":2026,"mois":9,"jour":30}]}],
-		"unites":{"consommation":"m3"},
+		"unites":{"consommation":"m3","debitMin":"l/h"},
 		"titulaire":{"nom":"Dupont","email":"jd@example.com"},
 		"id":"CT.secret", "refContrat": 12345678
 	}`)
 	out := string(Redact(body))
-	for _, want := range []string{`"consommation": 0.154`, `"annee": 2026`, `"mois": 9`, `"consommation": "m3"`} {
+	for _, want := range []string{`"consommation": 0.154`, `"annee": 2026`, `"mois": 9`, `"consommation": "m3"`, `"debitMin": "l/h"`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %s in\n%s", want, out)
 		}
