@@ -1,0 +1,27 @@
+configuration:
+  username:
+    name: Email
+    description: Login of your agence.eaudugrandlyon.com customer area.
+  password:
+    name: Password
+    description: Password of your customer area.
+  contract:
+    name: Contract
+    description: Only if your account has several contracts. Leave empty to use the first one.
+  name:
+    name: Name
+    description: Prefix of the statistics (EGL gives "EGL water" and "EGL water cost").
+  price_per_m3:
+    name: Price per m³ (TTC)
+    description: All-inclusive price from your bill, e.g. 3.56. For price changes, 3.56;2027-01-01=3.80. Leave empty to skip cost tracking.
+  update_times:
+    name: Update times
+    description: Local times to fetch new data, comma-separated (HH:MM).
+  history_days:
+    name: History on first run (days)
+    description: How far back to import the first time.
+  refresh_days:
+    name: Refresh window (days)
+    description: Recent days re-read on every update, to pick up late or corrected readings.
+  log_level:
+    name: Log level

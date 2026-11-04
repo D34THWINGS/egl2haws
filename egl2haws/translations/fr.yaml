@@ -1,0 +1,27 @@
+configuration:
+  username:
+    name: E-mail
+    description: Identifiant de votre espace client agence.eaudugrandlyon.com.
+  password:
+    name: Mot de passe
+    description: Mot de passe de votre espace client.
+  contract:
+    name: Contrat
+    description: Uniquement si votre compte a plusieurs contrats. Laisser vide pour utiliser le premier.
+  name:
+    name: Nom
+    description: Préfixe des statistiques (EGL donne « EGL water » et « EGL water cost »).
+  price_per_m3:
+    name: Prix au m³ (TTC)
+    description: Prix tout compris de votre facture, ex. 3.56. Pour un changement de tarif, 3.56;2027-01-01=3.80. Laisser vide pour ne pas suivre le coût.
+  update_times:
+    name: Horaires de mise à jour
+    description: Heures locales de récupération, séparées par des virgules (HH:MM).
+  history_days:
+    name: Historique au premier lancement (jours)
+    description: Profondeur de l'import initial.
+  refresh_days:
+    name: Fenêtre de rafraîchissement (jours)
+    description: Jours récents relus à chaque mise à jour, pour récupérer les relevés tardifs ou corrigés.
+  log_level:
+    name: Niveau de log
