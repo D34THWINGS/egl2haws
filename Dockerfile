@@ -16,6 +16,8 @@ LABEL org.opencontainers.image.source="https://github.com/D34THWINGS/egl2haws" \
       org.opencontainers.image.description="Imports Eau du Grand Lyon water consumption into Home Assistant's Energy dashboard" \
       org.opencontainers.image.licenses="MIT"
 COPY --from=build /out/egl2haws /egl2haws
-USER nonroot
+# Numeric so Kubernetes can enforce runAsNonRoot (it can't check a user name).
+# 65532 is distroless's nonroot user.
+USER 65532:65532
 ENTRYPOINT ["/egl2haws"]
 CMD ["run"]
