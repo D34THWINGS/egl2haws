@@ -1,0 +1,35 @@
+name: EGL water (egl2haws)
+version: "0.1.0"
+slug: egl2haws
+description: Imports Eau du Grand Lyon water consumption into the Energy dashboard
+url: https://github.com/D34THWINGS/egl2haws
+arch:
+  - amd64
+  - aarch64
+# Multi-arch image published by the release workflow; the Supervisor pulls
+# the tag named after `version`.
+image: ghcr.io/d34thwings/egl2haws
+init: false
+startup: application
+boot: auto
+# Gives the add-on SUPERVISOR_TOKEN and ws://supervisor/core/websocket.
+homeassistant_api: true
+options:
+  username: ""
+  password: ""
+  name: EGL
+  price_per_m3: ""
+  update_times: "08:00,16:00"
+  history_days: 730
+  refresh_days: 90
+  log_level: info
+schema:
+  username: email
+  password: password
+  contract: str?
+  name: str
+  price_per_m3: str?
+  update_times: str
+  history_days: int(1,1825)
+  refresh_days: int(1,365)
+  log_level: list(debug|info|warn|error)

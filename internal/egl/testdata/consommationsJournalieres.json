@@ -1,0 +1,394 @@
+{
+  "postes": [
+    {
+      "data": [
+        {
+          "annee": 2026,
+          "consommation": 387.0,
+          "debitMin": 0.0,
+          "index": 100000.0,
+          "jour": 21,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 117.0,
+          "debitMin": 0.0,
+          "index": 100387.0,
+          "jour": 22,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 72.0,
+          "debitMin": 0.0,
+          "index": 100504.0,
+          "jour": 23,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 200.0,
+          "debitMin": 0.0,
+          "index": 100576.0,
+          "jour": 24,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 185.0,
+          "debitMin": 0.0,
+          "index": 100776.0,
+          "jour": 25,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 174.0,
+          "debitMin": 0.0,
+          "index": 100961.0,
+          "jour": 26,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 131.0,
+          "debitMin": 0.0,
+          "index": 101135.0,
+          "jour": 27,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 112.0,
+          "debitMin": 0.0,
+          "index": 101266.0,
+          "jour": 28,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 406.0,
+          "debitMin": 0.0,
+          "index": 101378.0,
+          "jour": 29,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 339.0,
+          "debitMin": 0.0,
+          "index": 101784.0,
+          "jour": 30,
+          "mois": 8,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 104.0,
+          "debitMin": 0.0,
+          "index": 102123.0,
+          "jour": 1,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 362.0,
+          "debitMin": 0.0,
+          "index": 102227.0,
+          "jour": 2,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 276.0,
+          "debitMin": 0.0,
+          "index": 102589.0,
+          "jour": 3,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 76.0,
+          "debitMin": 0.0,
+          "index": 102865.0,
+          "jour": 4,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 75.0,
+          "debitMin": 0.0,
+          "index": 102941.0,
+          "jour": 5,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 107.0,
+          "debitMin": 0.0,
+          "index": 103016.0,
+          "jour": 6,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 171.0,
+          "debitMin": 0.0,
+          "index": 103123.0,
+          "jour": 7,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 179.0,
+          "debitMin": 0.0,
+          "index": 103294.0,
+          "jour": 8,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 318.0,
+          "debitMin": 0.0,
+          "index": 103473.0,
+          "jour": 9,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 368.0,
+          "debitMin": 0.0,
+          "index": 103791.0,
+          "jour": 10,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 73.0,
+          "debitMin": 0.0,
+          "index": 104159.0,
+          "jour": 11,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 347.0,
+          "debitMin": 0.0,
+          "index": 104232.0,
+          "jour": 12,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 161.0,
+          "debitMin": 0.0,
+          "index": 104579.0,
+          "jour": 13,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 392.0,
+          "debitMin": 0.0,
+          "index": 104740.0,
+          "jour": 14,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 419.0,
+          "debitMin": 0.0,
+          "index": 105132.0,
+          "jour": 15,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 339.0,
+          "debitMin": 0.0,
+          "index": 105551.0,
+          "jour": 16,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 274.0,
+          "debitMin": 0.0,
+          "index": 105890.0,
+          "jour": 17,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 172.0,
+          "debitMin": 0.0,
+          "index": 106164.0,
+          "jour": 18,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 289.0,
+          "debitMin": 0.0,
+          "index": 106336.0,
+          "jour": 19,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 361.0,
+          "debitMin": 0.0,
+          "index": 106625.0,
+          "jour": 20,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 202.0,
+          "debitMin": 0.0,
+          "index": 106986.0,
+          "jour": 21,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 63.0,
+          "debitMin": 0.0,
+          "index": 107188.0,
+          "jour": 22,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 141.0,
+          "debitMin": 0.0,
+          "index": 107251.0,
+          "jour": 23,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 417.0,
+          "debitMin": 0.0,
+          "index": 107392.0,
+          "jour": 24,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 276.0,
+          "debitMin": 0.0,
+          "index": 107809.0,
+          "jour": 25,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 234.0,
+          "debitMin": 0.0,
+          "index": 108085.0,
+          "jour": 26,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 202.0,
+          "debitMin": 0.0,
+          "index": 108319.0,
+          "jour": 27,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 139.0,
+          "debitMin": 0.0,
+          "index": 108521.0,
+          "jour": 28,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 170.0,
+          "debitMin": 0.0,
+          "index": 108660.0,
+          "jour": 29,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 232.0,
+          "debitMin": 0.0,
+          "index": 108830.0,
+          "jour": 30,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 112.0,
+          "debitMin": 0.0,
+          "index": 109062.0,
+          "jour": 31,
+          "mois": 9,
+          "volumeEstimeFuite": 0.0
+        },
+        {
+          "annee": 2026,
+          "consommation": 107.0,
+          "debitMin": 0.0,
+          "index": 109174.0,
+          "jour": 1,
+          "mois": 10,
+          "volumeEstimeFuite": 0.0
+        }
+      ],
+      "libelle": "Toutes Heures",
+      "prefixe": null
+    }
+  ],
+  "unites": {
+    "consommation": "l",
+    "debitMin": "REDACTED",
+    "index": "REDACTED",
+    "volumeEstimeFuite": "REDACTED"
+  }
+}
