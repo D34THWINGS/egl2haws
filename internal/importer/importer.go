@@ -63,6 +63,9 @@ type Result struct {
 	CostRows     int
 	TotalLiters  float64 // volume sum after the sync
 	TotalCostEUR float64
+	LeakRows     int // rows written to the min-flow and leak-estimate statistics
+	// Fetched are the readings EGL returned, oldest first, for leak checks.
+	Fetched []egl.Reading
 }
 
 // Error wraps failures with the system that failed, for logs and alerting.
@@ -85,9 +88,11 @@ func Slug(name string) string {
 	return s
 }
 
-// VolumeID and CostID are the statistic IDs written for a config.
-func (c Config) VolumeID() string { return Source + ":" + Slug(c.Name) + "_volume" }
-func (c Config) CostID() string   { return Source + ":" + Slug(c.Name) + "_cost" }
+// Statistic IDs written for a config.
+func (c Config) VolumeID() string       { return Source + ":" + Slug(c.Name) + "_volume" }
+func (c Config) CostID() string         { return Source + ":" + Slug(c.Name) + "_cost" }
+func (c Config) MinFlowID() string      { return Source + ":" + Slug(c.Name) + "_min_flow" }
+func (c Config) LeakEstimateID() string { return Source + ":" + Slug(c.Name) + "_leak_estimate" }
 
 // sentinel is "before any data" for statistics queries.
 var sentinel = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -118,7 +123,7 @@ func Run(ctx context.Context, cfg Config, now time.Time, e EGL, h HA) (Result, e
 	if err != nil {
 		return res, &Error{"egl", err}
 	}
-	res.Readings = len(readings)
+	res.Readings, res.Fetched = len(readings), readings
 	if len(readings) == 0 {
 		res.TotalLiters = lastSum(existing)
 		return res, nil
@@ -170,6 +175,10 @@ func Run(ctx context.Context, cfg Config, now time.Time, e EGL, h HA) (Result, e
 	}
 	res.VolumeRows, res.TotalLiters = len(vol), sum
 
+	if res.LeakRows, err = importLeakStats(ctx, cfg, h, readings); err != nil {
+		return res, &Error{"home_assistant", err}
+	}
+
 	if len(cfg.Prices) == 0 {
 		return res, nil
 	}
@@ -186,6 +195,39 @@ func Run(ctx context.Context, cfg Config, now time.Time, e EGL, h HA) (Result, e
 		res.CostRows, res.TotalCostEUR = len(cost), cost[len(cost)-1].Sum
 	}
 	return res, nil
+}
+
+// importLeakStats writes the daily minimum flow and EGL's leak estimate as
+// measurement statistics, for graphs. Only days EGL reported are written:
+// unlike volume, there's no running total to keep consistent.
+func importLeakStats(ctx context.Context, cfg Config, h HA, readings []egl.Reading) (int, error) {
+	var flow, est []ha.Stat
+	for _, r := range readings {
+		at := r.Date.In(cfg.Location)
+		if r.MinFlowLH != nil {
+			flow = append(flow, ha.Stat{Start: at, State: *r.MinFlowLH})
+		}
+		if r.LeakLiters != nil {
+			est = append(est, ha.Stat{Start: at, State: *r.LeakLiters})
+		}
+	}
+	for _, s := range []struct {
+		md   ha.Metadata
+		rows []ha.Stat
+	}{
+		// Flow has a unit class in HA but not every release accepts L/h in
+		// it: null keeps the import valid everywhere.
+		{ha.Metadata{StatisticID: cfg.MinFlowID(), Source: Source, Name: cfg.Name + " water minimum flow", UnitOfMeasurement: "L/h", Mean: true}, flow},
+		{ha.Metadata{StatisticID: cfg.LeakEstimateID(), Source: Source, Name: cfg.Name + " water leak estimate", UnitOfMeasurement: "L", UnitClass: "volume", Mean: true}, est},
+	} {
+		if len(s.rows) == 0 {
+			continue
+		}
+		if err := h.ImportStatistics(ctx, s.md, s.rows); err != nil {
+			return 0, err
+		}
+	}
+	return len(flow) + len(est), nil
 }
 
 // costRows rebuilds the whole cost series from the volume history: rows

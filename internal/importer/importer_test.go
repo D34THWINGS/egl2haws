@@ -235,3 +235,42 @@ func TestSlug(t *testing.T) {
 		}
 	}
 }
+
+// leakEGL serves readings with the leak fields set.
+type leakEGL struct{ rs []egl.Reading }
+
+func (l leakEGL) Readings(_ context.Context, from, to egl.Date) ([]egl.Reading, error) {
+	var out []egl.Reading
+	for _, r := range l.rs {
+		if !r.Date.Before(from) && !to.Before(r.Date) {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+func TestLeakStatistics(t *testing.T) {
+	flow, est := 6.0, 0.0
+	e := leakEGL{rs: []egl.Reading{
+		{Date: d(10, 30), Liters: 100},                                     // no leak fields reported
+		{Date: d(10, 31), Liters: 150, MinFlowLH: &flow, LeakLiters: &est}, // reported
+	}}
+	h := newFakeHA()
+	res, err := Run(context.Background(), cfg(""), time.Date(2026, 11, 2, 9, 0, 0, 0, paris), e, h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.LeakRows != 2 || len(res.Fetched) != 2 {
+		t.Fatalf("result %+v", res)
+	}
+	mf := h.sorted("egl2haws:home_min_flow")
+	if len(mf) != 1 || mf[0].State != 6 || !mf[0].Start.Equal(d(10, 31).In(paris)) {
+		t.Fatalf("min flow rows %+v", mf)
+	}
+	if md := h.meta["egl2haws:home_min_flow"]; !md.Mean || md.UnitOfMeasurement != "L/h" {
+		t.Errorf("min flow metadata %+v", md)
+	}
+	if md := h.meta["egl2haws:home_leak_estimate"]; !md.Mean || md.UnitOfMeasurement != "L" || md.UnitClass != "volume" {
+		t.Errorf("leak estimate metadata %+v", md)
+	}
+}

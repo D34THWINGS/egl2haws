@@ -93,3 +93,64 @@ func TestParseStart(t *testing.T) {
 		t.Fatal(b, err)
 	}
 }
+
+func TestImportMeanStatistic(t *testing.T) {
+	f := fake.NewHA(t)
+	ctx := context.Background()
+	c, err := Dial(ctx, f.URL, fake.HAToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	start := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	md := Metadata{StatisticID: "egl2haws:home_min_flow", Source: "egl2haws", UnitOfMeasurement: "L/h", Mean: true}
+	if err := c.ImportStatistics(ctx, md, []Stat{{Start: start, State: 6}}); err != nil {
+		t.Fatal(err)
+	}
+	m := f.Metadata(md.StatisticID)
+	if m["mean_type"] != float64(1) || m["has_mean"] != true || m["has_sum"] != false || m["unit_class"] != nil {
+		t.Errorf("metadata %v", m)
+	}
+	if rows := f.Rows(md.StatisticID); len(rows) != 1 || rows[0].Mean != 6 {
+		t.Errorf("rows %+v", rows)
+	}
+}
+
+func TestRESTBase(t *testing.T) {
+	for in, want := range map[string]string{
+		"ws://ha:8123/api/websocket":                      "http://ha:8123/api",
+		"wss://ha.example.com/api/websocket":              "https://ha.example.com/api",
+		"ws://supervisor/core/websocket":                  "http://supervisor/core/api",
+		"ws://home-assistant.home.svc:8080/api/websocket": "http://home-assistant.home.svc:8080/api",
+	} {
+		if got, err := RESTBase(in); err != nil || got != want {
+			t.Errorf("RESTBase(%s) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	if _, err := RESTBase("http://ha:8123"); err == nil {
+		t.Error("expected error for a non-websocket URL")
+	}
+}
+
+func TestSetState(t *testing.T) {
+	f := fake.NewHA(t)
+	base, err := RESTBase(f.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	s := States{Base: base, Token: fake.HAToken}
+	if err := s.Set(ctx, "binary_sensor.egl_water_leak", "on", map[string]any{"device_class": "moisture"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Set(ctx, "binary_sensor.egl_water_leak", "off", nil); err != nil { // update: 200 instead of 201
+		t.Fatal(err)
+	}
+	if st, ok := f.EntityState("binary_sensor.egl_water_leak"); !ok || st.State != "off" {
+		t.Fatalf("state %+v", st)
+	}
+	bad := States{Base: base, Token: "nope"}
+	if err := bad.Set(ctx, "binary_sensor.x", "on", nil); !errors.Is(err, ErrAuth) {
+		t.Fatalf("expected ErrAuth, got %v", err)
+	}
+}
