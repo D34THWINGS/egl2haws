@@ -95,9 +95,18 @@ func TestParseLiveFormat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, base, err := parseReadings(body, Date{2026, 9, 20}, Date{2026, 11, 4}, nil)
+	got, base, units, err := parseReadings(body, Date{2026, 9, 20}, Date{2026, 11, 4}, nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if units.Consommation != "l" {
+		t.Errorf("units %+v", units)
+	}
+	// The fixture's leak-field units were redacted: defaults apply (L/h, L).
+	for _, r := range got {
+		if r.MinFlowLH == nil || *r.MinFlowLH != 0 || r.LeakLiters == nil || *r.LeakLiters != 0 {
+			t.Fatalf("leak fields not parsed on %s: %+v", r.Date, r)
+		}
 	}
 	if !base.ZeroBased || !base.Decisive {
 		t.Errorf("month base %+v, want decisive 0-based (mois 9 + jour 31 only exists as October)", base)
@@ -116,5 +125,33 @@ func TestParseLiveFormat(t *testing.T) {
 	}
 	if got[0].Liters != 387 || byDay[Date{2026, 10, 31}] != 112 || got[len(got)-1].Liters != 107 || total != 9281 {
 		t.Errorf("unexpected volumes: first=%v oct31=%v last=%v total=%v", got[0].Liters, byDay[Date{2026, 10, 31}], got[len(got)-1].Liters, total)
+	}
+}
+
+func TestParseLeakFields(t *testing.T) {
+	from, to := Date{2026, 3, 1}, Date{2026, 3, 31}
+	body := `{"postes":[{"data":[
+		{"consommation":0.5,"debitMin":0.012,"volumeEstimeFuite":0.288,"annee":2026,"mois":2,"jour":3},
+		{"consommation":0.1,"annee":2026,"mois":2,"jour":4}
+	]}],"unites":{"consommation":"m3","debitMin":"m3/h","volumeEstimeFuite":"m3"}}`
+	got, err := ParseReadings([]byte(body), from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].MinFlowLH == nil || *got[0].MinFlowLH != 12 || got[0].LeakLiters == nil || *got[0].LeakLiters != 288 {
+		t.Errorf("day 1: %+v", got[0])
+	}
+	if got[1].MinFlowLH != nil || got[1].LeakLiters != nil {
+		t.Errorf("day 2 should have no leak fields: %+v", got[1])
+	}
+	for unit, want := range map[string]float64{"l/h": 1, "L/h": 1, "m³/h": 1000, "l/min": 60, "": 1, "REDACTED": 1} {
+		if f := flowLHFactor(unit); f != want {
+			t.Errorf("flowLHFactor(%q) = %v, want %v", unit, f, want)
+		}
+	}
+	// A negative min flow is ignored rather than failing the sync.
+	got, err = ParseReadings([]byte(`[{"consommation":1,"debitMin":-1,"annee":2026,"mois":2,"jour":3}]`), from, to)
+	if err != nil || got[0].MinFlowLH != nil {
+		t.Errorf("negative debitMin: %+v, %v", got, err)
 	}
 }

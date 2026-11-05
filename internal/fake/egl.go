@@ -40,6 +40,8 @@ type EGL struct {
 	redirectHop bool
 	readings    string
 	days        map[string]float64 // YYYY-MM-DD -> m³, served 0-based like the live API
+	minFlows    map[string]float64 // YYYY-MM-DD -> debitMin, l/h
+	leaks       map[string]float64 // YYYY-MM-DD -> volumeEstimeFuite, l
 	lastQuery   url.Values
 }
 
@@ -60,6 +62,15 @@ func (f *EGL) SetReadings(body string) { f.mu.Lock(); f.readings, f.days = body,
 // range and encoded like the live API (0-based months, m³).
 func (f *EGL) SetDays(days map[string]float64) { f.mu.Lock(); f.days = days; f.mu.Unlock() }
 
+// SetLeakFields adds debitMin (L/h) and volumeEstimeFuite (L) to the days
+// served by SetDays. Days missing from both maps get 0 for both, like the
+// live API.
+func (f *EGL) SetLeakFields(minFlows, leaks map[string]float64) {
+	f.mu.Lock()
+	f.minFlows, f.leaks = minFlows, leaks
+	f.mu.Unlock()
+}
+
 func (f *EGL) daysBody(q url.Values) string {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", q.Get("dateDebut"))
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", q.Get("dateFin"))
@@ -69,9 +80,10 @@ func (f *EGL) daysBody(q url.Values) string {
 		if err != nil || d.Before(from) || d.After(to) {
 			continue
 		}
-		entries = append(entries, fmt.Sprintf(`{"consommation":%g,"annee":%d,"mois":%d,"jour":%d}`, m3, d.Year(), int(d.Month())-1, d.Day()))
+		entries = append(entries, fmt.Sprintf(`{"consommation":%g,"debitMin":%g,"volumeEstimeFuite":%g,"annee":%d,"mois":%d,"jour":%d}`,
+			m3, f.minFlows[day], f.leaks[day], d.Year(), int(d.Month())-1, d.Day()))
 	}
-	return `{"postes":[{"data":[` + strings.Join(entries, ",") + `]}],"unites":{"consommation":"m3"}}`
+	return `{"postes":[{"data":[` + strings.Join(entries, ",") + `]}],"unites":{"consommation":"m3","debitMin":"l/h","volumeEstimeFuite":"l"}}`
 }
 
 // ExpireNext makes the next authenticated call fail with 401.

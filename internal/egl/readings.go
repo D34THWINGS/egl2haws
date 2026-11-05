@@ -42,13 +42,29 @@ func (d Date) String() string { return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.M
 type Reading struct {
 	Date   Date
 	Liters float64
+	// MinFlowLH is the lowest flow the meter measured that day, in L/h
+	// (debitMin). Without a leak, water use stops at some point (usually at
+	// night), so it's 0. Nil when EGL doesn't report it.
+	MinFlowLH *float64
+	// LeakLiters is EGL's own estimate of the volume leaked that day
+	// (volumeEstimeFuite). Nil when EGL doesn't report it.
+	LeakLiters *float64
 }
 
 type rawReading struct {
-	Consommation *float64 `json:"consommation"`
-	Annee        int      `json:"annee"`
-	Mois         int      `json:"mois"`
-	Jour         int      `json:"jour"`
+	Consommation      *float64 `json:"consommation"`
+	DebitMin          *float64 `json:"debitMin"`
+	VolumeEstimeFuite *float64 `json:"volumeEstimeFuite"`
+	Annee             int      `json:"annee"`
+	Mois              int      `json:"mois"`
+	Jour              int      `json:"jour"`
+}
+
+// Units are the units EGL declared in a response ("unites"), as received.
+type Units struct {
+	Consommation      string `json:"consommation"`
+	DebitMin          string `json:"debitMin"`
+	VolumeEstimeFuite string `json:"volumeEstimeFuite"`
 }
 
 // ParseReadings decodes a consommationsJournalieres response for the
@@ -65,7 +81,7 @@ type rawReading struct {
 // otherwise the reading whose dates fall inside the requested range wins
 // (the wrong one shifts every date by a month); ties default to 0-based.
 func ParseReadings(body []byte, from, to Date) ([]Reading, error) {
-	r, _, err := parseReadings(body, from, to, nil)
+	r, _, _, err := parseReadings(body, from, to, nil)
 	return r, err
 }
 
@@ -79,71 +95,106 @@ type MonthBase struct {
 
 // parseReadings is ParseReadings with an optional known month base, which
 // skips detection.
-func parseReadings(body []byte, from, to Date, known *MonthBase) ([]Reading, MonthBase, error) {
+func parseReadings(body []byte, from, to Date, known *MonthBase) ([]Reading, MonthBase, Units, error) {
 	var raws []rawReading
-	unit := "l"
+	var units Units
 	trimmed := strings.TrimSpace(string(body))
 	if strings.HasPrefix(trimmed, "[") {
 		if err := json.Unmarshal(body, &raws); err != nil {
-			return nil, MonthBase{}, fmt.Errorf("decode readings: %w", err)
+			return nil, MonthBase{}, units, fmt.Errorf("decode readings: %w", err)
 		}
 	} else {
 		var resp struct {
 			Postes []struct {
 				Data []rawReading `json:"data"`
 			} `json:"postes"`
-			Unites struct {
-				Consommation string `json:"consommation"`
-			} `json:"unites"`
+			Unites Units `json:"unites"`
 		}
 		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, MonthBase{}, fmt.Errorf("decode readings: %w", err)
+			return nil, MonthBase{}, units, fmt.Errorf("decode readings: %w", err)
 		}
 		if len(resp.Postes) > 0 {
 			raws = resp.Postes[0].Data
 		}
-		if u := strings.ToLower(strings.TrimSpace(resp.Unites.Consommation)); u != "" {
-			unit = u
-		}
+		units = resp.Unites
 	}
 	if len(raws) == 0 {
-		return nil, MonthBase{}, nil
+		return nil, MonthBase{}, units, nil
 	}
 
+	unit := strings.ToLower(strings.TrimSpace(units.Consommation))
+	if unit == "" {
+		unit = "l"
+	}
 	factor, err := litersFactor(unit)
 	if err != nil {
-		return nil, MonthBase{}, err
+		return nil, MonthBase{}, units, err
+	}
+	// The leak fields only feed leak detection: an unknown unit for them
+	// falls back to the default instead of failing the sync.
+	flowFactor := flowLHFactor(units.DebitMin)
+	leakFactor, err := litersFactor(strings.ToLower(strings.TrimSpace(units.VolumeEstimeFuite)))
+	if err != nil {
+		leakFactor = 1
 	}
 
 	base := MonthBase{}
 	if known != nil {
 		base = *known
 	} else if base, err = detectMonthBase(raws, from, to); err != nil {
-		return nil, MonthBase{}, err
+		return nil, MonthBase{}, units, err
 	}
 	zeroBased := base.ZeroBased
 
-	byDay := map[Date]float64{}
+	byDay := map[Date]Reading{}
 	for _, r := range raws {
 		d, ok := toDate(r, zeroBased)
 		if !ok {
-			return nil, MonthBase{}, fmt.Errorf("invalid date annee=%d mois=%d jour=%d", r.Annee, r.Mois, r.Jour)
+			return nil, MonthBase{}, units, fmt.Errorf("invalid date annee=%d mois=%d jour=%d", r.Annee, r.Mois, r.Jour)
 		}
 		v := 0.0
 		if r.Consommation != nil {
 			v = *r.Consommation * factor
 		}
-		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
-			return nil, MonthBase{}, fmt.Errorf("invalid consumption %v on %s", v, d)
+		if !validAmount(v) {
+			return nil, MonthBase{}, units, fmt.Errorf("invalid consumption %v on %s", v, d)
 		}
-		byDay[d] = v // a later entry for the same day wins
+		reading := Reading{Date: d, Liters: v}
+		if r.DebitMin != nil && validAmount(*r.DebitMin) {
+			f := *r.DebitMin * flowFactor
+			reading.MinFlowLH = &f
+		}
+		if r.VolumeEstimeFuite != nil && validAmount(*r.VolumeEstimeFuite) {
+			l := *r.VolumeEstimeFuite * leakFactor
+			reading.LeakLiters = &l
+		}
+		byDay[d] = reading // a later entry for the same day wins
 	}
 	out := make([]Reading, 0, len(byDay))
-	for d, v := range byDay {
-		out = append(out, Reading{Date: d, Liters: v})
+	for _, r := range byDay {
+		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Date.Before(out[j].Date) })
-	return out, base, nil
+	return out, base, units, nil
+}
+
+func validAmount(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }
+
+// flowLHFactor converts a declared flow unit to L/h. Unknown or missing
+// units are assumed to be L/h.
+func flowLHFactor(unit string) float64 {
+	switch strings.ToLower(strings.ReplaceAll(strings.TrimSpace(unit), " ", "")) {
+	case "m3/h", "m³/h":
+		return 1000
+	case "l/min":
+		return 60
+	case "m3/j", "m³/j", "m3/d", "m³/d":
+		return 1000.0 / 24
+	case "l/j", "l/d":
+		return 1.0 / 24
+	default: // "l/h", "l" and anything unrecognized
+		return 1
+	}
 }
 
 func litersFactor(unit string) (float64, error) {

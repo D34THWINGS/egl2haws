@@ -1,6 +1,7 @@
 package fake
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -23,15 +24,26 @@ const HAToken = "good"
 type HA struct {
 	URL string // ws:// URL
 
-	mu   sync.Mutex
-	rows map[string]map[int64]map[string]any // id -> start ms -> row
-	meta map[string]map[string]any
+	mu     sync.Mutex
+	rows   map[string]map[int64]map[string]any // id -> start ms -> row
+	meta   map[string]map[string]any
+	states map[string]State
+}
+
+// State is an entity state set through the REST API.
+type State struct {
+	State      string
+	Attributes map[string]any
 }
 
 // NewHA starts a fake HA server, closed when the test ends.
 func NewHA(t testing.TB) *HA {
-	f := &HA{rows: map[string]map[int64]map[string]any{}, meta: map[string]map[string]any{}}
+	f := &HA{rows: map[string]map[int64]map[string]any{}, meta: map[string]map[string]any{}, states: map[string]State{}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/states/") {
+			f.setState(w, r)
+			return
+		}
 		f.serve(t, w, r)
 	}))
 	t.Cleanup(srv.Close)
@@ -39,10 +51,15 @@ func NewHA(t testing.TB) *HA {
 	return f
 }
 
-// Row is a stored statistics row.
+// Row is a stored statistics row. Mean rows have Mean set and no State/Sum.
 type Row struct {
-	Start      time.Time
-	State, Sum float64
+	Start            time.Time
+	State, Sum, Mean float64
+}
+
+func num(row map[string]any, k string) float64 {
+	v, _ := row[k].(float64)
+	return v
 }
 
 // Rows returns the stored rows of a statistic, oldest first.
@@ -51,10 +68,48 @@ func (f *HA) Rows(id string) []Row {
 	defer f.mu.Unlock()
 	var out []Row
 	for ms, r := range f.rows[id] {
-		out = append(out, Row{Start: time.UnixMilli(ms).UTC(), State: r["state"].(float64), Sum: r["sum"].(float64)})
+		out = append(out, Row{Start: time.UnixMilli(ms).UTC(), State: num(r, "state"), Sum: num(r, "sum"), Mean: num(r, "mean")})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Start.Before(out[j].Start) })
 	return out
+}
+
+// EntityState returns an entity state set through the REST API.
+func (f *HA) EntityState(id string) (State, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	st, ok := f.states[id]
+	return st, ok
+}
+
+func (f *HA) setState(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if r.Header.Get("Authorization") != "Bearer "+HAToken {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var body struct {
+		State      string         `json:"state"`
+		Attributes map[string]any `json:"attributes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.State == "" {
+		http.Error(w, `{"message":"State data should be valid JSON"}`, http.StatusBadRequest)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/states/")
+	f.mu.Lock()
+	_, existed := f.states[id]
+	f.states[id] = State{State: body.State, Attributes: body.Attributes}
+	f.mu.Unlock()
+	if existed {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"entity_id": id, "state": body.State})
 }
 
 // Metadata returns the last metadata imported for a statistic.
@@ -130,6 +185,14 @@ func (f *HA) serve(t testing.TB, w http.ResponseWriter, r *http.Request) {
 					bad = true
 					break
 				}
+				// Rows must match the statistic's kind.
+				_, hasMean := row["mean"]
+				_, hasSum := row["sum"]
+				if md["mean_type"] == float64(1) && (!hasMean || md["has_sum"] == true) ||
+					md["mean_type"] == float64(0) && (!hasSum || md["has_sum"] != true) {
+					bad = true
+					break
+				}
 				f.rows[sid][start.UnixMilli()] = row
 			}
 			f.mu.Unlock()
@@ -145,7 +208,7 @@ func (f *HA) serve(t testing.TB, w http.ResponseWriter, r *http.Request) {
 			var rows []map[string]any
 			for _, r := range f.Rows(sid) {
 				if !r.Start.Before(from) && r.Start.Before(to) {
-					rows = append(rows, map[string]any{"start": r.Start.UnixMilli(), "end": r.Start.Add(time.Hour).UnixMilli(), "state": r.State, "sum": r.Sum})
+					rows = append(rows, map[string]any{"start": r.Start.UnixMilli(), "end": r.Start.Add(time.Hour).UnixMilli(), "state": r.State, "sum": r.Sum, "mean": r.Mean})
 				}
 			}
 			result := map[string]any{}

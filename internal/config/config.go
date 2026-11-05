@@ -16,6 +16,7 @@ import (
 
 	"github.com/D34THWINGS/egl2haws/internal/egl"
 	"github.com/D34THWINGS/egl2haws/internal/importer"
+	"github.com/D34THWINGS/egl2haws/internal/leak"
 )
 
 // AddonOptionsPath is where the Supervisor writes add-on options.
@@ -40,6 +41,10 @@ type Config struct {
 	RefreshDays int
 	LogLevel    string
 	LogFormat   string
+	// LeakDetection publishes leak entities to Home Assistant; Leak tunes
+	// the rules.
+	LeakDetection bool
+	Leak          leak.Config
 }
 
 // TimeOfDay is a local "HH:MM".
@@ -58,6 +63,12 @@ type options struct {
 	HistoryDays int    `json:"history_days"`
 	RefreshDays int    `json:"refresh_days"`
 	LogLevel    string `json:"log_level"`
+
+	LeakDetection      *bool    `json:"leak_detection"`
+	LeakMinFlow        *float64 `json:"leak_min_flow"`
+	LeakDays           int      `json:"leak_days"`
+	LeakSpikeFactor    *float64 `json:"leak_spike_factor"`
+	LeakSpikeMinLiters *float64 `json:"leak_spike_min_liters"`
 }
 
 // Load resolves the configuration. getenv is os.Getenv in production.
@@ -90,6 +101,23 @@ func Load(getenv func(string) string, optionsPath string) (Config, error) {
 		}
 		if opt > 0 {
 			return opt, nil
+		}
+		return def, nil
+	}
+
+	pickFloat := func(env string, opt *float64, def float64) (float64, error) {
+		if v := strings.TrimSpace(getenv(env)); v != "" {
+			f, err := strconv.ParseFloat(strings.Replace(v, ",", ".", 1), 64)
+			if err != nil || f < 0 {
+				return 0, fmt.Errorf("%s: %q is not a positive number", env, v)
+			}
+			return f, nil
+		}
+		if opt != nil {
+			if *opt < 0 {
+				return 0, fmt.Errorf("%s: must be positive", env)
+			}
+			return *opt, nil
 		}
 		return def, nil
 	}
@@ -145,6 +173,29 @@ func Load(getenv func(string) string, optionsPath string) (Config, error) {
 	if c.RefreshDays, err = pickInt("REFRESH_DAYS", opts.RefreshDays, 90); err != nil {
 		errs = append(errs, err)
 	}
+	c.LeakDetection = true
+	if v := strings.TrimSpace(getenv("LEAK_DETECTION")); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("LEAK_DETECTION: %q is not true or false", v))
+		}
+		c.LeakDetection = b
+	} else if opts.LeakDetection != nil {
+		c.LeakDetection = *opts.LeakDetection
+	}
+	if c.Leak.MinFlowLH, err = pickFloat("LEAK_MIN_FLOW", opts.LeakMinFlow, 0); err != nil {
+		errs = append(errs, err)
+	}
+	if c.Leak.Days, err = pickInt("LEAK_DAYS", opts.LeakDays, 2); err != nil {
+		errs = append(errs, err)
+	}
+	if c.Leak.SpikeFactor, err = pickFloat("LEAK_SPIKE_FACTOR", opts.LeakSpikeFactor, 0); err != nil {
+		errs = append(errs, err)
+	}
+	if c.Leak.SpikeMinLiters, err = pickFloat("LEAK_SPIKE_MIN_LITERS", opts.LeakSpikeMinLiters, 100); err != nil {
+		errs = append(errs, err)
+	}
+
 	switch c.LogLevel {
 	case "debug", "info", "warn", "warning", "error":
 	default:

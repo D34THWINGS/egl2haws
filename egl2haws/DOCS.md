@@ -16,6 +16,25 @@ Assistant's long-term statistics, for the Energy dashboard's **Water** section.
    source**, pick **EGL water**, and for the cost choose *Use an entity
    tracking the total costs* → **EGL water cost**.
 
+## Leak detection
+
+The add-on publishes `binary_sensor.egl_water_leak` (device class *moisture*)
+and `sensor.egl_water_min_flow` (with the default name). The binary sensor
+turns on when, for EGL's latest published day:
+
+- EGL itself estimates a leak, or
+- the meter's minimum flow of the day stayed above **Leak flow threshold**
+  for **Days of continuous flow** days in a row: without a leak, water use
+  stops at some point (usually at night), so the minimum is 0. A running
+  toilet or a dripping pipe keeps it above 0;
+- optionally, the day used far more than usual (**Unusual consumption
+  factor**, off by default).
+
+Use it in an automation to get a notification. EGL publishes readings 1 to 3
+days late, so this catches slow leaks, not a burst pipe. If something
+legitimately runs all night (a water softener, garden watering), raise the
+threshold.
+
 ## How it works
 
 - Updates run at the configured times (default 08:00 and 16:00). EGL publishes

@@ -136,9 +136,13 @@ type Metadata struct {
 	Name              string
 	UnitOfMeasurement string
 	UnitClass         string // empty means null (e.g. currency)
+	// Mean makes it a measurement (mean/min/max per row, e.g. a flow) instead
+	// of a running total (state/sum, e.g. a volume).
+	Mean bool
 }
 
-// Stat is one hourly statistics row. Start must be on the hour.
+// Stat is one hourly statistics row. Start must be on the hour. For a Mean
+// statistic, State is the row's value and Sum is ignored.
 type Stat struct {
 	Start time.Time
 	State float64
@@ -154,10 +158,14 @@ func (c *Client) ImportStatistics(ctx context.Context, md Metadata, stats []Stat
 	if md.UnitClass != "" {
 		unitClass = md.UnitClass
 	}
+	meanType := 0 // none
+	if md.Mean {
+		meanType = 1 // arithmetic
+	}
 	meta := map[string]any{
-		"has_mean":            false, // deprecated, still sent for older HA
-		"mean_type":           0,
-		"has_sum":             true,
+		"has_mean":            md.Mean, // deprecated, still sent for older HA
+		"mean_type":           meanType,
+		"has_sum":             !md.Mean,
 		"name":                md.Name,
 		"source":              md.Source,
 		"statistic_id":        md.StatisticID,
@@ -171,11 +179,14 @@ func (c *Client) ImportStatistics(ctx context.Context, md Metadata, stats []Stat
 			if s.Start.Minute() != 0 || s.Start.Second() != 0 || s.Start.Nanosecond() != 0 {
 				return fmt.Errorf("statistic start %s is not on the hour", s.Start)
 			}
-			rows = append(rows, map[string]any{
-				"start": s.Start.Format(time.RFC3339),
-				"state": round(s.State),
-				"sum":   round(s.Sum),
-			})
+			row := map[string]any{"start": s.Start.Format(time.RFC3339)}
+			if md.Mean {
+				v := round(s.State)
+				row["mean"], row["min"], row["max"] = v, v, v
+			} else {
+				row["state"], row["sum"] = round(s.State), round(s.Sum)
+			}
+			rows = append(rows, row)
 		}
 		err := c.call(ctx, map[string]any{"type": "recorder/import_statistics", "metadata": meta, "stats": rows}, nil)
 		if err != nil {
