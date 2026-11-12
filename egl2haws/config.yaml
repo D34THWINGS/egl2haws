@@ -1,5 +1,5 @@
 name: EGL water (egl2haws)
-version: "0.1.0"
+version: "0.2.0"
 slug: egl2haws
 description: Imports Eau du Grand Lyon water consumption into the Energy dashboard
 url: https://github.com/D34THWINGS/egl2haws
@@ -22,6 +22,11 @@ options:
   update_times: "08:00,16:00"
   history_days: 730
   refresh_days: 90
+  leak_detection: true
+  leak_min_flow: 0
+  leak_days: 2
+  leak_spike_factor: 0
+  leak_spike_min_liters: 100
   log_level: info
 schema:
   username: email
@@ -32,4 +37,9 @@ schema:
   update_times: str
   history_days: int(1,1825)
   refresh_days: int(1,365)
+  leak_detection: bool
+  leak_min_flow: float(0,)
+  leak_days: int(1,30)
+  leak_spike_factor: float(0,)
+  leak_spike_min_liters: float(0,)
   log_level: list(debug|info|warn|error)

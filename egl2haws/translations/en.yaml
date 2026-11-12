@@ -23,5 +23,20 @@ configuration:
   refresh_days:
     name: Refresh window (days)
     description: Recent days re-read on every update, to pick up late or corrected readings.
+  leak_detection:
+    name: Leak detection
+    description: Publish binary_sensor.<name>_water_leak and sensor.<name>_water_min_flow.
+  leak_min_flow:
+    name: Leak flow threshold (L/h)
+    description: A day counts as continuous flow when the meter's minimum flow stays above this. 0 means any flow; raise it if something legitimately runs all night (e.g. a water softener).
+  leak_days:
+    name: Days of continuous flow
+    description: Consecutive days of continuous flow before reporting a leak.
+  leak_spike_factor:
+    name: Unusual consumption factor
+    description: Also report a day using more than this many times the 30-day median (e.g. 3). 0 disables it.
+  leak_spike_min_liters:
+    name: Unusual consumption minimum (L)
+    description: Ignore increases smaller than this, in litres.
   log_level:
     name: Log level

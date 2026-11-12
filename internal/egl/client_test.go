@@ -42,9 +42,9 @@ func TestFullFlow(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := []Reading{
-				{Date{2026, 10, 30}, 123},
-				{Date{2026, 11, 1}, 200},
-				{Date{2026, 11, 2}, 0},
+				{Date: Date{2026, 10, 30}, Liters: 123},
+				{Date: Date{2026, 11, 1}, Liters: 200},
+				{Date: Date{2026, 11, 2}, Liters: 0},
 			}
 			if len(got) != len(want) {
 				t.Fatalf("got %v, want %v", got, want)

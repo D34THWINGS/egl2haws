@@ -99,6 +99,8 @@ type Client struct {
 	// MonthBase is set once a response has shown how months are numbered;
 	// later responses are parsed the same way.
 	MonthBase *MonthBase
+	// Units are the units declared in the last readings response, for logs.
+	Units Units
 
 	http     *http.Client
 	token    string
@@ -352,12 +354,15 @@ func (c *Client) Readings(ctx context.Context, from, to Date) ([]Reading, error)
 	if status != http.StatusOK {
 		return nil, &Error{Step: StepReadings, Status: status, Err: fmt.Errorf("unexpected response: %s", snippet(body))}
 	}
-	readings, base, err := parseReadings(body, from, to, c.MonthBase)
+	readings, base, units, err := parseReadings(body, from, to, c.MonthBase)
 	if err != nil {
 		return nil, &Error{Step: StepReadings, Status: status, Err: err}
 	}
 	if c.MonthBase == nil && base.Decisive {
 		c.MonthBase = &base
+	}
+	if units != (Units{}) {
+		c.Units = units
 	}
 	return readings, nil
 }

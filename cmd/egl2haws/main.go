@@ -74,28 +74,49 @@ func main() {
 		log.Error("invalid configuration", "error", err.Error())
 		os.Exit(2)
 	}
+	pub, err := newLeakPublisher(cfg)
+	if err != nil {
+		log.Error("invalid configuration", "error", "leak detection: "+err.Error())
+		os.Exit(2)
+	}
 	log.Info("egl2haws starting", "version", version, "mode", cmd,
 		"volume_statistic", importerConfig(cfg).VolumeID(), "cost_tracking", len(cfg.Prices) > 0,
+		"leak_detection", cfg.LeakDetection,
 		"update_times", fmt.Sprint(cfg.UpdateTimes), "timezone", cfg.Location.String())
 
 	if cmd == "once" {
-		if err := syncOnce(ctx, cfg, log); err != nil {
+		if err := syncOnce(ctx, cfg, log, pub); err != nil {
 			os.Exit(1)
 		}
 		return
 	}
-	loop(ctx, cfg, log)
+	loop(ctx, cfg, log, pub)
 }
 
-func loop(ctx context.Context, cfg config.Config, log *slog.Logger) {
+func loop(ctx context.Context, cfg config.Config, log *slog.Logger, pub *leakPublisher) {
 	attempt := 0
 	next := time.Now()
 	for {
-		if !sleepUntil(ctx, next) {
-			log.Info("egl2haws stopping")
-			return
+		// Between syncs, wake up to re-set the leak entities, which Home
+		// Assistant forgets on restart.
+		for {
+			wake := next
+			if due := pub.due(); !due.IsZero() && due.Before(wake) {
+				wake = due
+			}
+			if !sleepUntil(ctx, wake) {
+				log.Info("egl2haws stopping")
+				return
+			}
+			if !time.Now().Before(next) {
+				break
+			}
+			if err := pub.publish(ctx); err != nil {
+				log.Error("leak entities not published", "event", "leak_publish", "error", err.Error())
+				pub.published = time.Now() // retry at the next interval, not in a tight loop
+			}
 		}
-		err := syncOnce(ctx, cfg, log)
+		err := syncOnce(ctx, cfg, log, pub)
 		scheduled := config.Next(time.Now(), cfg.UpdateTimes, cfg.Location)
 		next = scheduled
 		if err != nil && !importer.IsAuth(err) && attempt < len(retryDelays) {
@@ -134,20 +155,20 @@ func importerConfig(cfg config.Config) importer.Config {
 
 // syncOnce runs one sync and logs exactly one "sync finished" line with
 // outcome=success|failure, the line monitors should key on.
-func syncOnce(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+func syncOnce(ctx context.Context, cfg config.Config, log *slog.Logger, pub *leakPublisher) error {
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
+	e := egl.New(cfg.Username, cfg.Password)
+	e.BaseURL = cfg.EGLBaseURL
+	e.ContractID = cfg.Contract
 	res, err := func() (importer.Result, error) {
 		h, err := ha.Dial(ctx, cfg.HAURL, cfg.HAToken)
 		if err != nil {
 			return importer.Result{}, &importer.Error{System: "home_assistant", Err: err}
 		}
 		defer h.Close()
-		e := egl.New(cfg.Username, cfg.Password)
-		e.BaseURL = cfg.EGLBaseURL
-		e.ContractID = cfg.Contract
 		return importer.Run(ctx, importerConfig(cfg), time.Now(), e, h)
 	}()
 
@@ -166,11 +187,13 @@ func syncOnce(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		return err
 	}
 	attrs = append(attrs, "outcome", "success", "volume_rows", res.VolumeRows, "cost_rows", res.CostRows,
-		"total_liters", res.TotalLiters, "total_cost_eur", res.TotalCostEUR)
+		"total_liters", res.TotalLiters, "total_cost_eur", res.TotalCostEUR, "leak_rows", res.LeakRows)
 	if res.Readings > 0 {
 		lag := int(time.Since(res.LastReading.In(cfg.Location)).Hours() / 24)
-		attrs = append(attrs, "last_reading", res.LastReading.String(), "last_reading_liters", res.LastLiters, "publication_lag_days", lag)
+		attrs = append(attrs, "last_reading", res.LastReading.String(), "last_reading_liters", res.LastLiters, "publication_lag_days", lag,
+			"egl_units", fmt.Sprintf("consommation=%s debitMin=%s volumeEstimeFuite=%s", e.Units.Consommation, e.Units.DebitMin, e.Units.VolumeEstimeFuite))
 	}
+	attrs = append(attrs, pub.evaluate(ctx, res, log)...)
 	log.Info("sync finished", attrs...)
 	return nil
 }

@@ -23,5 +23,20 @@ configuration:
   refresh_days:
     name: Fenêtre de rafraîchissement (jours)
     description: Jours récents relus à chaque mise à jour, pour récupérer les relevés tardifs ou corrigés.
+  leak_detection:
+    name: Détection de fuite
+    description: Publie binary_sensor.<nom>_water_leak et sensor.<nom>_water_min_flow.
+  leak_min_flow:
+    name: Seuil de débit de fuite (L/h)
+    description: Une journée compte comme débit continu quand le débit minimum du compteur reste au-dessus de ce seuil. 0 = tout débit ; à augmenter si un appareil tourne légitimement la nuit (ex. adoucisseur).
+  leak_days:
+    name: Jours de débit continu
+    description: Nombre de jours consécutifs de débit continu avant de signaler une fuite.
+  leak_spike_factor:
+    name: Facteur de consommation anormale
+    description: Signale aussi une journée dépassant ce multiple de la médiane sur 30 jours (ex. 3). 0 = désactivé.
+  leak_spike_min_liters:
+    name: Minimum de consommation anormale (L)
+    description: Ignore les hausses inférieures à ce volume, en litres.
   log_level:
     name: Niveau de log

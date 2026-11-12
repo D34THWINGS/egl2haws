@@ -100,3 +100,37 @@ func TestNext(t *testing.T) {
 		}
 	}
 }
+
+func TestLeakSettings(t *testing.T) {
+	base := map[string]string{"EGL_USERNAME": "u", "EGL_PASSWORD": "p", "HA_URL": "http://ha:8123", "HA_TOKEN": "t"}
+	c, err := Load(env(base), "/nonexistent/options.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.LeakDetection || c.Leak.MinFlowLH != 0 || c.Leak.Days != 2 || c.Leak.SpikeFactor != 0 || c.Leak.SpikeMinLiters != 100 {
+		t.Errorf("defaults: %+v %+v", c.LeakDetection, c.Leak)
+	}
+	for k, v := range map[string]string{"LEAK_DETECTION": "false", "LEAK_MIN_FLOW": "2,5", "LEAK_DAYS": "3", "LEAK_SPIKE_FACTOR": "3"} {
+		base[k] = v
+	}
+	if c, err = Load(env(base), "/nonexistent/options.json"); err != nil {
+		t.Fatal(err)
+	}
+	if c.LeakDetection || c.Leak.MinFlowLH != 2.5 || c.Leak.Days != 3 || c.Leak.SpikeFactor != 3 {
+		t.Errorf("from env: %+v %+v", c.LeakDetection, c.Leak)
+	}
+	p := filepath.Join(t.TempDir(), "options.json")
+	if err := os.WriteFile(p, []byte(`{"username":"u","password":"p","leak_detection":false,"leak_min_flow":1.5,"leak_days":4}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if c, err = Load(env(map[string]string{"SUPERVISOR_TOKEN": "s"}), p); err != nil {
+		t.Fatal(err)
+	}
+	if c.LeakDetection || c.Leak.MinFlowLH != 1.5 || c.Leak.Days != 4 {
+		t.Errorf("from add-on options: %+v %+v", c.LeakDetection, c.Leak)
+	}
+	base["LEAK_DETECTION"], base["LEAK_MIN_FLOW"] = "maybe", "-1"
+	if _, err := Load(env(base), "/nonexistent/options.json"); err == nil || !strings.Contains(err.Error(), "LEAK_DETECTION") || !strings.Contains(err.Error(), "LEAK_MIN_FLOW") {
+		t.Errorf("expected leak setting errors, got %v", err)
+	}
+}

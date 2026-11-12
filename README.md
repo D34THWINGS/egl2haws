@@ -23,6 +23,9 @@ It's a small standalone service (a ~7 MB static Go binary), in the spirit of
   readings (EGL publishes 1 to 3 days late, sometimes in batches) are picked up.
 - Optional cost statistic from your price per m³, with dated price changes;
   recomputed on each update so price changes apply retroactively.
+- Leak detection: a `binary_sensor` turns on when water flows continuously for
+  days (running toilet, dripping pipe), when EGL itself estimates a leak, or,
+  optionally, on unusually high consumption.
 - Stateless: Home Assistant's statistics are the only state, no volume needed.
 - Ready for Home Assistant 2026.11+ statistics imports (`mean_type`, `unit_class`).
 - One JSON log line per update, with a classified error, for monitoring.
@@ -85,6 +88,11 @@ Secret; it needs no volume and no Service.
 | `TZ` | `Europe/Paris` | Time zone of the update times and of the daily statistics |
 | `HISTORY_DAYS` | `730` | Days imported on the first run |
 | `REFRESH_DAYS` | `90` | Days re-read and rewritten on every update |
+| `LEAK_DETECTION` | `true` | Publish the leak entities (see [Leak detection](#leak-detection)) |
+| `LEAK_MIN_FLOW` | `0` | A day counts as continuous flow when its minimum flow is above this, in L/h. Raise it if something legitimately runs all night (e.g. a water softener) |
+| `LEAK_DAYS` | `2` | Consecutive days of continuous flow before reporting a leak |
+| `LEAK_SPIKE_FACTOR` | `0` (off) | Also report a day using more than this many times the median of the previous 30 days, e.g. `3` |
+| `LEAK_SPIKE_MIN_LITERS` | `100` | Ignore unusual-consumption increases smaller than this, in litres |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `LOG_FORMAT` | `json` | `json` or `text` |
 
@@ -104,13 +112,78 @@ costs* and pick **EGL water cost**.
 Each day's consumption is stored at local midnight of that day, as one value
 per day: EGL doesn't provide hourly data.
 
+## Leak detection
+
+EGL's daily readings include the meter's **minimum flow of the day**
+(`debitMin`) and EGL's own **leak estimate** (`volumeEstimeFuite`). Without a
+leak, water use stops at some point, usually at night, so the minimum flow is
+0. If it stays above 0 for days, water runs all the time: a running toilet, a
+dripping tap or a leaking pipe.
+
+egl2haws publishes two entities:
+
+| Entity | State |
+|---|---|
+| `binary_sensor.<name>_water_leak` | `on` when a leak is suspected (device class `moisture`) |
+| `sensor.<name>_water_min_flow` | Latest day's minimum flow, in L/h |
+
+The binary sensor turns on when any of these is true for EGL's latest
+published day:
+
+- `egl_estimate`: EGL estimates a leak (above 0 L);
+- `continuous_flow`: the minimum flow stayed above `LEAK_MIN_FLOW` for
+  `LEAK_DAYS` days in a row;
+- `unusual_consumption` (only if `LEAK_SPIKE_FACTOR` is set): the day used more
+  than `LEAK_SPIKE_FACTOR` times the median of the previous 30 days, and at
+  least `LEAK_SPIKE_MIN_LITERS` more.
+
+Its attributes give the `reasons`, `last_reading`, `min_flow_l_h`,
+`continuous_flow_days`, `egl_leak_estimate_l`, `daily_liters` and
+`baseline_liters`. Two statistics are also written for graphs: `<name> water
+minimum flow` (`egl2haws:<name>_min_flow`) and `<name> water leak estimate`
+(`egl2haws:<name>_leak_estimate`).
+
+Example automation (notify your phone):
+
+```yaml
+alias: Water leak suspected
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.egl_water_leak
+    to: "on"
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: Possible water leak
+      message: >
+        {{ state_attr('binary_sensor.egl_water_leak', 'reasons') | join(', ') }}
+        on {{ state_attr('binary_sensor.egl_water_leak', 'last_reading') }}:
+        minimum flow {{ state_attr('binary_sensor.egl_water_leak', 'min_flow_l_h') }} L/h
+        for {{ state_attr('binary_sensor.egl_water_leak', 'continuous_flow_days') }} day(s).
+```
+
+Limits:
+
+- **It's slow.** EGL publishes readings 1 to 3 days late, so this finds slow,
+  continuous leaks, which are the costly ones that go unnoticed for weeks, not
+  a burst pipe. For that, use leak sensors and a shut-off valve.
+- **The entities aren't owned by an integration**: they're set through Home
+  Assistant's REST API, so they can't be renamed or customized from the UI,
+  and they disappear on a Home Assistant restart. egl2haws sets them again
+  every 30 minutes.
+- Units: the minimum flow is converted to L/h from the unit EGL declares; if
+  none is declared, L/h is assumed. The sync log shows the declared units
+  (`egl_units`).
+
 ## Monitoring
 
 Each update logs exactly one line with `"msg":"sync finished"` and
 `"event":"sync"`:
 
 - `"outcome":"success"`, with `readings`, `last_reading` (latest day EGL
-  published), `publication_lag_days`, `total_liters`, `total_cost_eur`;
+  published), `publication_lag_days`, `total_liters`, `total_cost_eur`, and
+  with leak detection on, `leak`, `leak_reasons`, `min_flow_l_h`,
+  `leak_flow_days`, `egl_leak_estimate_l`;
 - `"outcome":"failure"`, with `error`, `error_system` (`egl` or
   `home_assistant`), `error_step` (`login`, `roles`, `authorize`, `token`,
   `contracts`, `readings`), `error_http_status`, and `error_kind`:
@@ -125,6 +198,10 @@ Each update logs exactly one line with `"msg":"sync finished"` and
 
 Failed updates are retried after 15 minutes and 1 hour (except `auth`). A
 useful alert: no `outcome:success` line in 24 hours.
+
+When a leak is suspected, an extra `"msg":"leak detected"` line is logged at
+`WARN` level (`"event":"leak"`), so a leak can also be alerted on from your
+logs.
 
 ## Reporting an API change
 
